@@ -1,12 +1,11 @@
 # Voting App — Helm + Azure DevOps on AKS
 
-This is a continuation of my [ArgoCD project](https://github.com/ChetnaPanday/voting-app-aks-argocd) where I deployed the same voting app but this time using Helm charts and Azure DevOps pipelines instead of plain manifests and ArgoCD.
+This is a continuation of my [ArgoCD project](https://github.com/Chetna-DevOps/voting-app-aks-argocd) where I deployed the same voting app but this time using Helm charts and Azure DevOps pipelines instead of plain manifests and ArgoCD.
 
 ## What's Different Here
 
 - Plain k8s manifests replaced with Helm charts
 - ArgoCD replaced with Azure DevOps CD pipelines
-- Redis and PostgreSQL deployed using Bitnami Helm charts
 - App deployed in `test` namespace instead of `default`
 
 ## Tech Stack
@@ -14,8 +13,8 @@ This is a continuation of my [ArgoCD project](https://github.com/ChetnaPanday/vo
 - **Vote frontend** — Python (Flask) — lets users vote between two options
 - **Result frontend** — Node.js — shows live voting results
 - **Worker** — C# (.NET) — consumes votes from Redis and stores in PostgreSQL
-- **Queue** — Redis (Bitnami)
-- **Database** — PostgreSQL (Bitnami)
+- **Redis** — collects incoming votes 
+- **Database** — PostgreSQL 
 - **Registry** — Azure Container Registry
 - **Ingress** — NGINX on AKS
 - **CD** — Azure DevOps Pipelines + Helm
@@ -23,6 +22,10 @@ This is a continuation of my [ArgoCD project](https://github.com/ChetnaPanday/vo
 ## Project Structure
 
 ```
+├── db/
+│   ├── charts/          # Helm chart
+├── redis/
+│   ├── charts/          # Helm chart
 ├── vote/
 │   ├── charts/          # Helm chart
 │   ├── app.py
