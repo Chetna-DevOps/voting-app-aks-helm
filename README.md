@@ -2,6 +2,10 @@
 
 This is a continuation of my [ArgoCD project](https://github.com/Chetna-DevOps/voting-app-aks-argocd) where I deployed the same voting app but this time using Helm charts and Azure DevOps pipelines instead of plain manifests and ArgoCD.
 
+## Credits
+
+Base application from [dockersamples/example-voting-app](https://github.com/dockersamples/example-voting-app).
+
 ## What's Different Here
 
 - Plain k8s manifests replaced with Helm charts
@@ -46,9 +50,9 @@ This is a continuation of my [ArgoCD project](https://github.com/Chetna-DevOps/v
 
 ## Pipelines
 
-There are 4 pipelines — run infra first, then the rest in any order:
+There are 4 pipelines —
 
-1. **infra** — deploys Redis and PostgreSQL via Bitnami charts (run once)
+1. **infra** — deploys Redis and PostgreSQL (run once)
 2. **vote** — builds image, pushes to ACR, deploys via Helm
 3. **result** — same as above
 4. **worker** — same as above
@@ -69,14 +73,9 @@ http://vote.<CLUSTER-IP>.nip.io
 http://result.<CLUSTER-IP>.nip.io
 ```
 
-## Credits
-
-Base application from [dockersamples/example-voting-app](https://github.com/dockersamples/example-voting-app).
-
 ## What I Did
 
-- Wrote Helm charts for all three custom services
-- Used Bitnami charts for Redis and PostgreSQL instead of writing them from scratch
-- Set up separate Azure DevOps pipelines per service with build and deploy stages
+- Wrote Helm charts for all three custom services and also for infra (redis & db)
+- Set up separate Azure DevOps pipelines with build and deploy stages
 - Kept worker chart without ingress since it's a background processor with no UI
 - Used `$(Build.BuildId)` as image tag so each deployment is traceable to its build
