@@ -1,0 +1,112 @@
+trigger: none
+
+variables:
+- group: ci-cd-variables
+- name: imageRepository
+  value: votinghelm/vote
+- name: dockerfilePath
+  value: $(Build.SourcesDirectory)/vote/Dockerfile
+- name: environment
+  value: test
+
+stages:
+
+# ================= BUILD & PUSH =================
+
+- stage: build
+  displayName: Build and Push Docker Image (vote)
+  jobs:
+  - job: build
+    displayName: Build and Push
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+
+    - task: Docker@2
+      displayName: Build and Push Docker Image (vote)
+      inputs:
+        containerRegistry: '$(containerregistryserviceconnection)'
+        repository: '$(imageRepository)'
+        command: 'buildAndPush'
+        Dockerfile: '$(dockerfilePath)'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+
+# ================= DEPLOY =================
+
+- stage: deploy
+  dependsOn: build
+  displayName: Deploy Result to AKS
+  jobs:
+  - deployment: deploy
+    displayName: Deploy to Test Cluster
+    environment: test
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          # ================= CONNECT TO AKS =================
+          - task: AzureCLI@2
+            displayName: Connect to AKS
+            inputs:
+              azureSubscription: 'azurerm-sc'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Connecting to AKS cluster: $(aksClusterName)"
+                az aks get-credentials \
+                  --resource-group $(resourceGroup) \
+                  --name $(aksClusterName) \
+                  --overwrite-existing
+
+          # ================= CREATE NAMESPACE =================
+          - task: AzureCLI@2
+            displayName: Create Namespace
+            inputs:
+              azureSubscription: 'azurerm-sc'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Creating namespace: $(namespace)"
+                kubectl create namespace $(namespace) || echo "Namespace already exists"
+
+          # ================= CREATE ACR SECRET =================
+          - task: AzureCLI@2
+            displayName: Create ACR Pull Secret
+            inputs:
+              azureSubscription: 'azurerm-sc'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                kubectl create secret docker-registry acr-secret \
+                  --docker-server=$(acr_login_server) \
+                  --docker-username=$(acr_username) \
+                  --docker-password=$(acr_password) \
+                  --namespace=$(namespace) \
+                  --dry-run=client -o yaml | kubectl apply -f -
+
+          # ================= INSTALL HELM =================
+          - task: HelmInstaller@1
+            displayName: Install Helm
+            inputs:
+              helmVersionToInstall: '3.12.0'
+
+          # ================= DEPLOY USING HELM =================
+          - task: HelmDeploy@0
+            displayName: Deploy Vote
+            inputs:
+              connectionType: None
+              command: upgrade
+              install: true
+              chartType: FilePath
+              chartPath: $(Build.SourcesDirectory)/vote/charts
+              releaseName: vote
+              valueFile: $(Build.SourcesDirectory)/vote/charts/values.yaml
+              overrideValues: 'image.repository=$(acr_login_server)/votinghelm/vote,image.tag=$(Build.BuildId)'
+              namespace: $(namespace)
+              arguments: '--wait=false'

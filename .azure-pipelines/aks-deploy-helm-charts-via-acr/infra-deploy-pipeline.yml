@@ -1,0 +1,76 @@
+trigger: none
+
+variables:
+- group: ci-cd-variables
+- name: environment
+  value: test
+
+stages:
+- stage: deploy_infra
+  displayName: Deploy Redis and PostgreSQL
+  jobs:
+  - deployment: deploy
+    displayName: Deploy to Test Cluster
+    environment: test
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          # ================= CONNECT TO AKS =================
+          - task: AzureCLI@2
+            displayName: Connect to AKS
+            inputs:
+              azureSubscription: 'azurerm-sc'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Connecting to AKS cluster: $(aksClusterName)"
+                az aks get-credentials \
+                  --resource-group $(resourceGroup) \
+                  --name $(aksClusterName) \
+                  --overwrite-existing
+
+          # ================= CREATE NAMESPACE =================
+          - task: AzureCLI@2
+            displayName: Create Namespace
+            inputs:
+              azureSubscription: 'azurerm-sc'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Creating namespace: $(namespace)"
+                kubectl create namespace $(namespace) || echo "Namespace already exists"
+
+          # ================= INSTALL HELM =================
+          - task: HelmInstaller@1
+            displayName: Install Helm
+            inputs:
+              helmVersionToInstall: '3.12.0'
+
+          # ================= DEPLOY REDIS =================
+          - task: HelmDeploy@0
+            displayName: Deploy Redis
+            inputs:
+              connectionType: None
+              command: upgrade
+              install: true
+              chartType: FilePath
+              chartPath: $(Build.SourcesDirectory)/redis/charts
+              releaseName: redis
+              namespace: $(namespace)
+              arguments: '--wait=false'
+
+          # ================= DEPLOY POSTGRESQL =================
+          - task: HelmDeploy@0
+            displayName: Deploy PostgreSQL
+            inputs:
+              connectionType: None
+              command: upgrade
+              install: true
+              chartType: FilePath
+              chartPath: $(Build.SourcesDirectory)/db/charts
+              releaseName: db
+              namespace: $(namespace)
+              arguments: '--wait=false'

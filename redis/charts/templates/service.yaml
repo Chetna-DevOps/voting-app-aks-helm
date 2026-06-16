@@ -1,0 +1,17 @@
+# Exposes Redis internally within the cluster
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "redis.fullname" . }}
+  labels:
+    app: {{ include "redis.name" . }}
+    helm.sh/chart: {{ include "redis.chart" . }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: redis-service
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+  selector:
+    app: {{ include "redis.name" . }}
